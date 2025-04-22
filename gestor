@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestor de Llaves</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#4f46e5',
+          },
+        },
+      },
+    };
+  </script>
+</head>
+<body class="bg-gray-100 text-xs uppercase">
+  <div id="app" class="min-h-screen p-4">
+    <div id="loginPanel" class="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 z-50">
+      <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-sm space-y-4">
+        <h2 class="text-lg font-bold text-center">Seleccionar Usuario</h2>
+        <select id="userSelect" class="w-full p-2 border rounded">
+          <option value="">Elige un usuario</option>
+          <option value="Mauro">👨‍💼 Mauro</option>
+          <option value="Chelo">👱‍♀️ Chelo</option>
+          <option value="Natalia">👩🏽‍💼 Natalia</option>
+        </select>
+        <input type="password" id="passwordInput" placeholder="Contraseña" class="w-full p-2 border rounded">
+        <button onclick="login()" class="w-full bg-primary text-white py-2 rounded">Ingresar</button>
+      </div>
+    </div>
+
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-xl font-bold">Organizador de Llaves Oficina</h1>
+      <button onclick="logout()" class="bg-red-500 text-white px-3 py-1 rounded">Cambiar Usuario</button>
+    </div>
+
+    <div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:space-x-4 justify-end">
+      <div class="relative w-full sm:w-1/2">
+        <input id="searchInput" type="text" placeholder="Buscar por código o dirección" class="p-2 pl-10 border rounded w-full">
+        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+          🔍
+        </div>
+      </div>
+      <button onclick="buscarLlave()" class="bg-primary text-white px-4 py-2 rounded mt-2 sm:mt-0">Buscar</button>
+    </div>
+
+    <form id="keyForm" class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+      <input required id="codigo" type="text" placeholder="CÓDIGO O REFERENCIA" class="p-2 border rounded">
+      <input required id="direccion" type="text" placeholder="DIRECCIÓN" class="p-2 border rounded">
+      <input required id="numeroLlave" type="number" placeholder="NÚMERO DE LLAVE (1-1000)" class="p-2 border rounded">
+      <input id="situacion" type="text" placeholder="SITUACIÓN" class="p-2 border rounded">
+      <input id="observaciones" type="text" placeholder="OBSERVACIONES" class="p-2 border rounded">
+      <input id="codAlarma" type="text" placeholder="CÓDIGO ALARMA" class="p-2 border rounded">
+      <input id="fechaIngreso" type="date" class="p-2 border rounded">
+      <select id="categoria" class="p-2 border rounded">
+        <option value="disponibles">🔑 Llaves disponibles</option>
+        <option value="haya">🔑 Llaves de Haya</option>
+        <option value="noPublicadas">🚫 Llaves no publicadas</option>
+      </select>
+      <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded col-span-1 sm:col-span-2">Guardar llave</button>
+    </form>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <h2 class="font-bold mb-2">🔑 Llaves disponibles</h2>
+        <ul id="listaDisponibles" class="space-y-1"></ul>
+      </div>
+      <div>
+        <h2 class="font-bold mb-2">🔑 Llaves de Haya</h2>
+        <ul id="listaHaya" class="space-y-1"></ul>
+      </div>
+      <div>
+        <h2 class="font-bold mb-2">🚫 Llaves no publicadas</h2>
+        <ul id="listaNoPublicadas" class="space-y-1"></ul>
+      </div>
+    </div>
+
+    <div class="mt-6">
+      <h2 class="font-bold text-red-600 mb-2">🗑️ Llaves eliminadas</h2>
+      <ul id="listaEliminadas" class="text-gray-700 space-y-1"></ul>
+    </div>
+
+    <div class="mt-10 text-center text-gray-500 text-xs">
+      Creado por Mauro González Salleras 🇦🇷<br>
+      Último usuario activo: <span id="ultimoUsuario"></span>
+    </div>
+  </div>
+
+  <script>
+    let usuarioActivo = null;
+    const usuarios = {
+      Mauro: '2020',
+      Chelo: '2021',
+      Natalia: '2022',
+    };
+
+    const keyData = JSON.parse(localStorage.getItem('llaves')) || [];
+    const eliminadas = JSON.parse(localStorage.getItem('eliminadas')) || [];
+
+    const login = () => {
+      const user = document.getElementById('userSelect').value;
+      const pass = document.getElementById('passwordInput').value;
+      if (usuarios[user] === pass) {
+        usuarioActivo = user;
+        document.getElementById('loginPanel').classList.add('hidden');
+        document.getElementById('ultimoUsuario').innerText = user;
+        localStorage.setItem('ultimoUsuario', user);
+        renderKeys();
+      } else {
+        alert('Contraseña incorrecta');
+      }
+    };
+
+    const logout = () => {
+      usuarioActivo = null;
+      document.getElementById('loginPanel').classList.remove('hidden');
+    };
+
+    document.getElementById('ultimoUsuario').innerText = localStorage.getItem('ultimoUsuario') || 'Ninguno';
+
+    document.getElementById('keyForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const codigo = document.getElementById('codigo').value.trim().toUpperCase();
+      const direccion = document.getElementById('direccion').value.trim().toUpperCase();
+      const numero = parseInt(document.getElementById('numeroLlave').value);
+      const situacion = document.getElementById('situacion').value.trim().toUpperCase();
+      const observaciones = document.getElementById('observaciones').value.trim().toUpperCase();
+      const codAlarma = document.getElementById('codAlarma').value.trim();
+      const fechaIngreso = document.getElementById('fechaIngreso').value;
+      const categoria = document.getElementById('categoria').value;
+
+      if (!codigo || !direccion || !numero) {
+        alert('Los campos CÓDIGO, DIRECCIÓN y NÚMERO DE LLAVE son obligatorios.');
+        return;
+      }
+
+      if (keyData.some(k => (k.numero === numero && k.categoria === categoria))) {
+        alert('Ya existe una llave con ese NÚMERO en esta categoría.');
+        return;
+      }
+
+      const nueva = {
+        codigo, direccion, numero, situacion, observaciones, codAlarma,
+        fechaIngreso, categoria, verificada: false, usuario: usuarioActivo,
+        editadoPor: '', fechaEdicion: ''
+      };
+      keyData.push(nueva);
+      guardarDatos();
+      renderKeys();
+      document.getElementById('keyForm').reset();
+    });
+
+    const guardarDatos = () => {
+      localStorage.setItem('llaves', JSON.stringify(keyData));
+      localStorage.setItem('eliminadas', JSON.stringify(eliminadas));
+    };
+
+    const renderKeys = () => {
+      const categorias = {
+        disponibles: document.getElementById('listaDisponibles'),
+        haya: document.getElementById('listaHaya'),
+        noPublicadas: document.getElementById('listaNoPublicadas')
+      };
+      Object.values(categorias).forEach(list => list.innerHTML = '');
+
+      keyData.sort((a, b) => a.numero - b.numero).forEach(k => {
+        const li = document.createElement('li');
+        li.className = 'bg-white p-2 rounded shadow flex justify-between items-start';
+        li.innerHTML = `
+          <div>
+            <div class="font-bold text-lg">#${k.numero} - ${k.codigo}</div>
+            <div>${k.direccion}</div>
+            <div class="text-[10px]">Alarma: ${k.codAlarma || '-'} | Ingreso: ${k.fechaIngreso || '-'}</div>
+            <div class="text-[10px]">Situación: ${k.situacion || '-'} | Obs: ${k.observaciones || '-'}</div>
+            <div class="text-gray-500 text-[10px]">Creado/modificado por ${k.usuario}${k.editadoPor ? ` | Última edición: ${k.editadoPor} (${k.fechaEdicion})` : ''}</div>
+          </div>
+          <div class="flex gap-2 items-center">
+            ${k.categoria === 'noPublicadas' ? `<button onclick="toggleCheck('${k.codigo}')" class="text-xs px-2 py-1 rounded ${k.verificada ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}">${k.verificada ? 'LLAVES COMPROBADAS POR ' + k.usuario : 'LLAVES NO COMPROBADAS'}</button>` : ''}
+            <button onclick="editarLlave('${k.codigo}')" class="text-yellow-600">✏️</button>
+            <button onclick="eliminarLlave('${k.codigo}')" class="text-red-600">🗑️</button>
+          </div>`;
+        categorias[k.categoria].appendChild(li);
+      });
+
+      const listaEliminadas = document.getElementById('listaEliminadas');
+      listaEliminadas.innerHTML = '';
+      eliminadas.forEach(e => {
+        const li = document.createElement('li');
+        li.textContent = `${e.codigo} - eliminado por ${e.usuario} el ${e.fecha} (${e.motivo})`;
+        listaEliminadas.appendChild(li);
+      });
+    };
+
+    const eliminarLlave = (codigo) => {
+      const motivo = prompt('Motivo de la eliminación:');
+      if (!motivo) return alert('Debes ingresar un motivo.');
+      const index = keyData.findIndex(k => k.codigo === codigo);
+      if (index >= 0) {
+        const k = keyData[index];
+        eliminadas.push({ codigo: k.codigo, usuario: usuarioActivo, fecha: new Date().toLocaleDateString(), motivo });
+        keyData.splice(index, 1);
+        guardarDatos();
+        renderKeys();
+      }
+    };
+
+    const toggleCheck = (codigo) => {
+      const llave = keyData.find(k => k.codigo === codigo);
+      if (llave) {
+        llave.verificada = !llave.verificada;
+        llave.usuario = usuarioActivo;
+        guardarDatos();
+        renderKeys();
+      }
+    };
+
+    const editarLlave = (codigo) => {
+      const llave = keyData.find(k => k.codigo === codigo);
+      if (llave) {
+        const nuevosDatos = prompt("Modificar datos (Dirección | Situación | Observaciones | Código Alarma)", `${llave.direccion} | ${llave.situacion} | ${llave.observaciones} | ${llave.codAlarma}`);
+        if (!nuevosDatos) return;
+        const [direccion, situacion, observaciones, codAlarma] = nuevosDatos.split('|').map(s => s.trim().toUpperCase());
+        llave.direccion = direccion;
+        llave.situacion = situacion;
+        llave.observaciones = observaciones;
+        llave.codAlarma = codAlarma;
+        llave.editadoPor = usuarioActivo;
+        llave.fechaEdicion = new Date().toLocaleDateString();
+        guardarDatos();
+        renderKeys();
+      }
+    };
+
+    const buscarLlave = () => {
+      const query = document.getElementById('searchInput').value.trim().toUpperCase();
+      if (!query) return renderKeys();
+
+      ['listaDisponibles', 'listaHaya', 'listaNoPublicadas'].forEach(id => {
+        const lista = document.getElementById(id);
+        Array.from(lista.children).forEach(item => {
+          item.style.display = item.innerText.includes(query) ? 'block' : 'none';
+        });
+      });
+    };
+
+    // Inicializa
+    renderKeys();
+  </script>
+</body>
+</html>
